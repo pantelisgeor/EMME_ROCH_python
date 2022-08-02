@@ -1,0 +1,99 @@
+getNutsClimAll <- function(path_nc,
+                           nuts3,
+                           n_jobs = 1,
+                           par_processing = FALSE) {
+
+  # Read the netcdf file
+  ds <- ncdf4::nc_open(path_nc)
+
+  # Get the size of the grid box and divide by 2 to get the
+  # offset to construct the square from the centre value
+  grid_box_size <- signif(abs(ds$dim$lon$vals[2] - ds$dim$lon$vals[1]), 4)
+
+  # Get the coordinates of the netcdf file
+  latlon <- data.frame()
+  lons <- ds$dim$lon$vals
+  lats <- ds$dim$lat$vals
+
+  for (lon in seq(min(lons)-grid_box_size, max(lons) + grid_box_size, 1)) {
+    for (lat in seq(min(lats)-grid_box_size, max(lats) + grid_box_size, 1)) {
+      latlon <- rbind(latlon,
+                      data.frame(lon=lon, lat=lat))
+    }
+  }
+
+  # Spatial feature data frame
+  coords <- sf::st_as_sf(latlon, coords = c("lon", "lat")) 
+  coords$lon <- latlon$lon
+  coords$lat <- latlon$lat
+  coords <- coords %>% sf::st_set_crs(
+    '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
+  # Make a new grid from them
+  coords <- sf::st_make_grid(coords, cellsize = grid_box_size, what = "centers")
+  coords <- sf::st_make_grid(coords, cellsize = grid_box_size)
+  coords <- sf::st_as_sf(dplyr::as_tibble(coords))
+
+  # surface area
+  coords$area <- sf::st_area(coords)
+
+  # Get the variable names from the netcdf file
+  var_names <- names(ds$var)
+
+  rm(ds)
+  gc()
+
+  # Do not use spherical geometry
+  sf::sf_use_s2(FALSE)
+
+  # Read the netcdf file in data.frame format
+  if ("time_bnds" %in% var_names) {
+    var_names <- var_names[var_names != "time_bnds"]
+  }
+  df <- metR::ReadNetCDF(path_nc, vars=var_names)
+
+
+  # if ("expver" %in% names(df)) {
+  #   df <- df[stats::complete.cases(df), ]
+  #   df <- df %>%
+  #     dplyr::group_by(time, latitude, longitude) %>%
+  #     dplyr::summarise(tp=sum(tp), t2m=mean(t2m))  # <=+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  # }
+
+
+  # If coordinate columns are not named lat and lon, rename them
+  lon_name <- colnames(df)[which(colnames(df) %in% c("longitude", "Longitude", "lon", "Lon", "lons", "Lons"))]
+  lat_name <- colnames(df)[which(colnames(df) %in% c("latitude", "Latitude", "lat", "Lat", "lats", "Lats"))]
+  if (lon_name != 'lon') {names(df)[names(df) == lon_name] <- 'lon'}
+  if (lat_name != 'lat') {names(df)[names(df) == lat_name] <- 'lat'}
+
+  # Drop missing values (over the sea)
+  df <- df[stats::complete.cases(df), ]
+
+  df$lat <- signif(df$lat, 4)
+  df$lon <- signif(df$lon, 4)
+
+  # Loop through the nuts3 regions and get the climate data for each
+
+  if (par_processing == TRUE) {
+
+    future::plan(future::multisession, workers = n_jobs)
+    df_nuts <- do.call('rbind',
+                       future.apply::future_lapply(nuts3$NUTS_ID, getNutsClim, df = df,
+                                                   coords = coords, nuts3 = nuts3,
+                                                   future.chunk.size = round(length(nuts3$NUTS_ID) / n_jobs) + 1,
+                                                   future.seed=TRUE)
+    )
+  } else {
+
+    df_nuts <- do.call('rbind',
+                       lapply(nuts3$NUTS_ID, getNutsClim, df = df, coords = coords, nuts3 = nuts3))
+  }
+
+  return(df_nuts)
+
+}
+
+
+
+
