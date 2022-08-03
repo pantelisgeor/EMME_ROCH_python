@@ -8,5 +8,10 @@ setup(name='EMME_ROCH',
       packages=['emme_roch'],
       python_requires='>=3.7',
       install_requires=['cdsapi', 
-                        'geopandas']
+                        'geopandas',
+                        'shapely',
+                        'xarray',
+                        'numpy',
+                        'pandas',
+                        'tqdm']
      )

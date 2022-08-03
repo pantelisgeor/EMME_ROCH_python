@@ -1,15 +1,17 @@
 import numpy as np
 import geopandas as gpd
 import xarray as xr
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Polygon
 from shapely.validation import make_valid
 import pandas as pd
 from tqdm import tqdm
 import warnings
+from functools import partial
+import multiprocessing as mp
+import gc
 
 # Options
 pd.set_option('display.max_columns', 20)
-warnings.filterwarnings('ignore')
 
 
 # ------------------------------------------------------------------------------- # 
@@ -35,7 +37,7 @@ def readNuts(shapefile="data-local/NUTS_RG_20M_2021_4326.shp/NUTS_RG_20M_2021_43
     if countries is not None:
         nuts_shp = nuts_shp[nuts_shp['CNTR_CODE'].isin(countries)]
 
-    return nuts_shp
+    return nuts_shp.reset_index(drop=True)
 
 
 # ------------------------------------------------------------------------------- # 
@@ -63,62 +65,131 @@ def make_polygon(x, y, offset):
 
 
 # ------------------------------------------------------------------------------- # 
+def getNutsclim(nuts_ind, df, nuts_shp, coords):
+    """
+    Returns the NUTS level area averaged data for a given NUTS region
+    
+    params:
+        nuts_ind: index of NUTS from the NUTS admin level shapefile
+        df: Climate data pandas dataframe
+        nuts_shp: NUTS administrative level shapefile (epsg 4326)
+        coords: coordinate shapefile from the climate dataset
 
-path_nc = "/home/pantelis/R/data_EMME_ROCH/climate/ERA_land_yr_2020_mnth_1.nc"
-nuts_shp = readNuts(countries=['EL', 'CY'])
+    returns:
+        pandas dataframe of the NUTS level area averaged climate variables
+    """
+    # Get the shape of the nuts region
+    nuts = nuts_shp.geometry.values[nuts_ind]
 
-# Open the netcdf file into an xarray
-ds = xr.open_dataset(path_nc)
+    # Get the intersecting members of the coords dataset
+    coords_inter = coords[coords.intersects(nuts)]
+    coords_inter.reset_index(drop=True, inplace=True)
+    # Get the shape of the intersections
+    coords_inter = coords_inter.assign(surf_area=coords_inter.area,
+                                    area_inter=coords_inter.intersection(nuts).area)
+    # Get the percentage cover and the centroid of the grid boxes
+    coords_inter = coords_inter.assign(perc_cover=coords_inter.area_inter/coords_inter.surf_area,
+                                    lon=coords_inter.centroid.x.round(3),
+                                    lat=coords_inter.centroid.y.round(3))
 
-# Coordinate names
-coord_names = ds.coords
-for c in coord_names:
-    if c in ["longitude", "Longitude", "lon", "Lon", "lons", "Lons"]:
-        ds = ds.rename({c: 'lon'})
-    elif c in ["latitude", "Latitude", "lat", "Lat", "lats", "Lats"]:
-        ds = ds.rename({c: 'lat'})
-        
 
-# Get the grid cell size
-grid_size = round(abs(ds.lat.values[1] - ds.lat.values[0]) / 2, 3)
+    df = df.assign(lon=df.lon.round(3), lat=df.lat.round(3))
 
-# Create a dataframe of the coordinates
-coords = pd.DataFrame()
-for lon in tqdm(ds.lon.values):
-    for lat in ds.lat.values:
-        coords = pd.concat([coords, pd.DataFrame({"lon": [lon], "lat": [lat]})])
+    # Add the percentage coverage column
+    df = pd.merge(df, coords_inter[['lon', 'lat', 'perc_cover']], on=['lon', 'lat'], how='left')
+    df.dropna(inplace=True)
 
-coords.reset_index(drop=True, inplace=True)
-# Round the numbers
-coords = coords.round(1)
+    # normalise the percentage coverage for the grid cells in the df dataframe
+    grid_points = df.groupby(['lon', 'lat', 'perc_cover'], as_index=False).size().drop('size', axis=1)
+    grid_points = grid_points.assign(perc_cover=grid_points.perc_cover/grid_points.perc_cover.sum())
+    # Add it back to df
+    df = pd.merge(df.drop('perc_cover', axis=1), grid_points, on=['lon', 'lat'], how='left')
 
-# Create a Polygon array based on the x, y positions of the centres and the grid_size
-geometries = coords.apply(lambda x: make_polygon(x.lon, x.lat, grid_size), 
-                                  axis=1)
-coords['geometry'] = geometries
-del(geometries)
-coords = gpd.GeoDataFrame(coords)
+    # Normalise the variables
+    for var in df.drop(['lon', 'lat', 'time', 'perc_cover'], axis=1).columns:
+        df[var] = df[var] * df['perc_cover']
 
-# Set the projection
-coords = coords.set_crs(epsg=4326)
-# coords['surf_area'] = coords.to_crs(crs=3857).area / 10**6
+    # Get the area averaged totals
+    df_clim = df.drop(['lon', 'lat', 'perc_cover'], axis=1).groupby('time', as_index=False).sum()
 
-# Get the surface area of the NUTS admin levels
-# nuts_shp['surf_area'] = nuts_shp.area / 10**6
+    # Add the nuts_id
+    df_clim = df_clim.assign(nuts_id=nuts_shp.NUTS_ID.values[nuts_ind])
+    return df_clim
 
 
 # ------------------------------------------------------------------------------- # 
-nuts = nuts_shp.geometry.values[0]
+def getNutsClimAll(path_nc, nuts_shp, n_jobs=1):
+    """
+    Calculates the NUTS area average climage dataset for a given netcdf file
 
-# Percentage overlap of the coords grid cells with a NUTS region
+    params:
+        path_nc: path to the netcdf dataset
+        nuts_shp: NUTS administrative level shapefile
+        n_jobs: Number of parallel processes to open to calculate the NUTS 
+                area averaged climate data
 
-# Get the intersecting members of the coords dataset
-coords_inter = coords[coords.intersects(nuts)]
-coords_inter.reset_index(drop=True, inplace=True)
-# Get the shape of the intersections
-coords_inter = coords_inter.assign(surf_area=coords_inter.area,
-                                   area_inter=coords_inter.intersection(nuts).area)
-# Get the percentage cover and the centroid of the grid boxes
-coords_inter = coords_inter.assign(perc_cover=coords_inter.area_inter/coords_inter.surf_area,
-                                   lon=coords_inter.centroid.x.round(3),
-                                   lat=coords_inter.centroid.y.round(3))
+    returns:
+        df_clim: pandas dataframe which hold the NUTS level averaged climate data
+    """
+
+    import warnings
+    warnings.filterwarnings('ignore')
+
+    # Open the netcdf file into an xarray
+    ds = xr.open_dataset(path_nc)
+
+    # Coordinate names
+    coord_names = ds.coords
+    for c in coord_names:
+        if c in ["longitude", "Longitude", "lon", "Lon", "lons", "Lons"]:
+            ds = ds.rename({c: 'lon'})
+        elif c in ["latitude", "Latitude", "lat", "Lat", "lats", "Lats"]:
+            ds = ds.rename({c: 'lat'})
+
+    # Get the grid cell size
+    grid_size = round(abs(ds.lat.values[1] - ds.lat.values[0]) / 2, 3)
+
+    # Create a dataframe of the coordinates
+    coords = pd.DataFrame()
+    for lon in tqdm(ds.lon.values):
+        for lat in ds.lat.values:
+            coords = pd.concat([coords, pd.DataFrame({"lon": [lon], "lat": [lat]})])
+
+    coords.reset_index(drop=True, inplace=True)
+    # Round the numbers
+    coords = coords.round(1)
+
+    # Create a Polygon array based on the x, y positions of the centres and the grid_size
+    geometries = coords.apply(lambda x: make_polygon(x.lon, x.lat, grid_size), axis=1)
+    coords['geometry'] = geometries
+    coords = gpd.GeoDataFrame(coords)
+
+    # Set the projection
+    coords = coords.set_crs(epsg=4326)
+
+    # Convert xarray to pandas dataframe
+    df = ds.to_dataframe().reset_index(drop=False)
+
+    # Delete variables that are not needed anymore and run garbage collection
+    del ds, coord_names, c, geometries
+    gc.collect()
+
+    # Run sequentially or pallalel (if n_jobs > 1)
+    if n_jobs > 1:
+        pool = mp.Pool(n_jobs)
+        df_clim = pd.concat(pool.map(partial(getNutsclim, df=df, nuts_shp=nuts_shp,
+                                             coords=coords), 
+                                     np.arange(nuts_shp.shape[0])))
+        pool.close()
+        pool.join()
+    else:
+        df_clim = pd.DataFrame()
+        for ind in tqdm(np.arange(nuts_shp.shape[0])):
+            df_clim = pd.concat([df_clim, getNutsclim(nuts_ind=ind,
+                                                    df=df, nuts_shp=nuts_shp,
+                                                    coords=coords)])
+
+    return df_clim.reset_index(drop=True)
+
+
+# ------------------------------------------------------------------------------- # 
