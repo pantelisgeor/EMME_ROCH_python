@@ -1,9 +1,15 @@
-from itertools import product
 import numpy as np
 import geopandas as gpd
 import xarray as xr
 from shapely.geometry import Point, Polygon
+from shapely.validation import make_valid
 import pandas as pd
+from tqdm import tqdm
+import warnings
+
+# Options
+pd.set_option('display.max_columns', 20)
+warnings.filterwarnings('ignore')
 
 
 # ------------------------------------------------------------------------------- # 
@@ -41,21 +47,25 @@ def make_polygon(x, y, offset):
         x, y: centre point (x, y)
         offset: Side of square / 2
     """
-    x = round(x, 2)
-    y = round(y, 2)
+    # print(f"x: {x} \ny: {y}\n")
+    # x = round(x, 4)
+    # y = round(y, 4)
     # Corners of Polygon
-    upper_left = [x+offset, y-offset]
-    upper_right = [x+offset, y+offset]
-    lower_left = [x-offset, y-offset]
-    lower_right = [x-offset, y+offset]
+    upper_left = (x+offset, y-offset)
+    upper_right = (x+offset, y+offset)
+    lower_left = (x-offset, y-offset)
+    lower_right = (x-offset, y+offset)
     # Create Polygon shape and return it
-    return Polygon([upper_left, upper_right, lower_left, lower_right])
+    polygon = Polygon([upper_left, upper_right, lower_left, lower_right])
+    if not polygon.is_valid:
+        polygon = make_valid(polygon)
+    return polygon
 
 
 # ------------------------------------------------------------------------------- # 
 
-path_nc = "/home/pantelis/R/data_EMME_ROCH/ERA_land_yr_2020_mnth_12.nc"
-# nuts_shp
+path_nc = "/home/pantelis/R/data_EMME_ROCH/climate/ERA_land_yr_2020_mnth_1.nc"
+nuts_shp = readNuts(countries=['EL', 'CY'])
 
 # Open the netcdf file into an xarray
 ds = xr.open_dataset(path_nc)
@@ -74,14 +84,41 @@ grid_size = round(abs(ds.lat.values[1] - ds.lat.values[0]) / 2, 3)
 
 # Create a dataframe of the coordinates
 coords = pd.DataFrame()
-for lon in ds.lon.values:
-    coords = pd.concat([coords, pd.DataFrame({"lon": lon, "lat": ds.lat.values})])
+for lon in tqdm(ds.lon.values):
+    for lat in ds.lat.values:
+        coords = pd.concat([coords, pd.DataFrame({"lon": [lon], "lat": [lat]})])
+
+coords.reset_index(drop=True, inplace=True)
 # Round the numbers
 coords = coords.round(1)
-# Create a geopandas geodataframe from the points
-coords = gpd.GeoDataFrame(coords, 
-                          geometry=gpd.points_from_xy(coords.lon, coords.lat))
+
 # Create a Polygon array based on the x, y positions of the centres and the grid_size
-coords['geometry'] = coords.apply(lambda x: make_polygon(x.lon, x.lat, grid_size), axis=1)
+geometries = coords.apply(lambda x: make_polygon(x.lon, x.lat, grid_size), 
+                                  axis=1)
+coords['geometry'] = geometries
+del(geometries)
+coords = gpd.GeoDataFrame(coords)
+
 # Set the projection
 coords = coords.set_crs(epsg=4326)
+# coords['surf_area'] = coords.to_crs(crs=3857).area / 10**6
+
+# Get the surface area of the NUTS admin levels
+# nuts_shp['surf_area'] = nuts_shp.area / 10**6
+
+
+# ------------------------------------------------------------------------------- # 
+nuts = nuts_shp.geometry.values[0]
+
+# Percentage overlap of the coords grid cells with a NUTS region
+
+# Get the intersecting members of the coords dataset
+coords_inter = coords[coords.intersects(nuts)]
+coords_inter.reset_index(drop=True, inplace=True)
+# Get the shape of the intersections
+coords_inter = coords_inter.assign(surf_area=coords_inter.area,
+                                   area_inter=coords_inter.intersection(nuts).area)
+# Get the percentage cover and the centroid of the grid boxes
+coords_inter = coords_inter.assign(perc_cover=coords_inter.area_inter/coords_inter.surf_area,
+                                   lon=coords_inter.centroid.x.round(3),
+                                   lat=coords_inter.centroid.y.round(3))
