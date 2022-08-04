@@ -28,7 +28,7 @@ def parse_name(x):
 
 
 # ------------------------------------------------------------------------------- # 
-def weekly_cdo(path_dat, name_prefix):
+def weekly_cdo(path_dat, name_prefix, path_out=None):
     """
     Uses the system's CDO operations to calculate the weekly mean of a climate
     netcdf variables, starting on a Monday
@@ -36,6 +36,7 @@ def weekly_cdo(path_dat, name_prefix):
     params:
         path_dat: Path to where the hourly netcdf files are located
         name_prefix: Prefix str to identify the dataset
+        path_out: Directory to save the output dataset (optional)
 
     returns:
         Nothing - saves the aggregated and weekly averaged netcdfs in the same folder
@@ -77,9 +78,7 @@ def weekly_cdo(path_dat, name_prefix):
     # Starts from Monday (=0)
     first_day = datetime.datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S").weekday()
     # If the first day is not a Monday, apply an offset to reach the first Monday
-    if first_day != 0:
-        day_offset = 7 - first_day
-    day_offset = first_day if first_day == 0 else 7-first_day
+    day_offset = first_day if first_day == 0 else 7 - first_day
 
     # Get the starting time-set (ie. next Monday)
     daily_steps = 24
@@ -89,6 +88,10 @@ def weekly_cdo(path_dat, name_prefix):
     # Weekly means starting on a Monday
     ndays_range = 7
     tstep_range = ndays_range*daily_steps
+
+    # If the user wants to use a different directory to save the data
+    if path_out is not None:
+        out_file = f"{path_out}{out_file}" if out_file.endswith('/') else f"{path_out}/{out_file}"
 
     # Run the weekly averaging procedure using cdo
     cdo_params = "-O -P 4 -f nc4 -z zip_5 -s"

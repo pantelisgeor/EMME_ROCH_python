@@ -5,13 +5,9 @@ from shapely.geometry import Polygon
 from shapely.validation import make_valid
 import pandas as pd
 from tqdm import tqdm
-import warnings
 from functools import partial
 import multiprocessing as mp
 import gc
-
-# Options
-pd.set_option('display.max_columns', 20)
 
 
 # ------------------------------------------------------------------------------- # 
@@ -139,6 +135,8 @@ def getNutsClimAll(path_nc, nuts_shp, n_jobs=1):
     ds = xr.open_dataset(path_nc)
 
     # Coordinate names
+    if "time_bnds" in ds.variables:
+        ds = ds.drop("time_bnds")
     coord_names = ds.coords
     for c in coord_names:
         if c in ["longitude", "Longitude", "lon", "Lon", "lons", "Lons"]:
@@ -174,7 +172,7 @@ def getNutsClimAll(path_nc, nuts_shp, n_jobs=1):
     del ds, coord_names, c, geometries
     gc.collect()
 
-    # Run sequentially or pallalel (if n_jobs > 1)
+    # Run sequentially or parallel (if n_jobs > 1)
     if n_jobs > 1:
         pool = mp.Pool(n_jobs)
         df_clim = pd.concat(pool.map(partial(getNutsclim, df=df, nuts_shp=nuts_shp,
