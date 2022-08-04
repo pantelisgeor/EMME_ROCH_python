@@ -105,19 +105,19 @@ def downloadMultipleCDS(month_start, month_end, year_start, year_end, path_save,
         for year in range(year_start, year_end+1):
             if year == year_start:
                 for month in range(month_start, 13):
-                    downloadCDS(month=month, year=year_start, path_save=path_save,
+                    downloadCDS(month=month, year=year, path_save=path_save,
                                 days=days, dataset=dataset, name_prefix=name_prefix,
                                 variables=variables, area=area)
             elif year == year_end:
                 for month in range(1, month_end+1):
-                    downloadCDS(month=month, year=year_start, path_save=path_save,
+                    downloadCDS(month=month, year=year, path_save=path_save,
                                 days=days, dataset=dataset, name_prefix=name_prefix,
                                 variables=variables, area=area)
             else:
                 for month in range(1, 13):
-                    downloadCDS(month=month, year=year_start, path_save=path_save,
+                    downloadCDS(month=month, year=year, path_save=path_save,
                                 days=days, dataset=dataset, name_prefix=name_prefix,
                                 variables=variables, area=area)
 
 
-# ------------------------------------------------------------------------------- #\
+# ------------------------------------------------------------------------------- #
