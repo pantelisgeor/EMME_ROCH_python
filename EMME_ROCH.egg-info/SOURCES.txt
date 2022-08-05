@@ -1,0 +1,11 @@
+setup.py
+EMME_ROCH.egg-info/PKG-INFO
+EMME_ROCH.egg-info/SOURCES.txt
+EMME_ROCH.egg-info/dependency_links.txt
+EMME_ROCH.egg-info/requires.txt
+EMME_ROCH.egg-info/top_level.txt
+src/__init__.py
+src/climate_temporal.py
+src/downloadCDS.py
+src/eurostat_data.py
+src/geometries.py

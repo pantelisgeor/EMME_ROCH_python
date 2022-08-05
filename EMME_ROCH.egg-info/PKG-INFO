@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: EMME-ROCH
+Version: 1.0
+Summary: Data Retrieval and Manipulation tools for EMME ROCH project
+Author: Pantelis Georgiades
+Author-email: p.georgiades@cyi.ac.cy
+Requires-Python: >=3.7

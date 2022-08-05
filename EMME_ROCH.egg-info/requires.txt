@@ -1,0 +1,7 @@
+cdsapi
+geopandas
+shapely
+xarray
+numpy
+pandas
+tqdm

@@ -1,4 +1,5 @@
 from distutils.core import setup
+from setuptools import find_packages
 
 setup(name='EMME_ROCH',
       version='1.0',
@@ -6,6 +7,7 @@ setup(name='EMME_ROCH',
       author='Pantelis Georgiades',
       author_email='p.georgiades@cyi.ac.cy',
       packages=['emme_roch'],
+      package_dir={'emme_roch': 'src'},
       python_requires='>=3.7',
       install_requires=['cdsapi', 
                         'geopandas',
@@ -13,5 +15,6 @@ setup(name='EMME_ROCH',
                         'xarray',
                         'numpy',
                         'pandas',
-                        'tqdm']
+                        'tqdm',
+                        'eurostat']
      )
