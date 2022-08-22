@@ -1,6 +1,6 @@
 cdsapi
 geopandas
-shapely
+shapely<2.0
 xarray
 numpy
 pandas

@@ -14,7 +14,7 @@ def readNuts(shapefile="data-local/NUTS_RG_20M_2021_4326.shp/NUTS_RG_20M_2021_43
     from geopandas import read_file
     
     # Read the shapefile using the geopandas library
-    nuts_shp = gpd.read_file(shapefile)
+    nuts_shp = read_file(shapefile)
 
     # Subset for the specified NUTS level
     nuts_shp = nuts_shp[nuts_shp['LEVL_CODE'].isin(nuts_levels)]
