@@ -51,7 +51,7 @@ def checkYears(files):
             # Get the missing months
             missing_months = list(present_months.difference(set(months)))
             if len(missing_months) > 1:
-                df_temp = DataFrame({'year': year, 'months_missing': missing_months})
+                df_temp = DataFrame({'year': year, 'months_missing': [missing_months]})
             elif len(missing_months) == 1:
                 df_temp = DataFrame({'year': [year], 'months_missing': [missing_months]})
             # Add it to a dataframe to return
@@ -87,6 +87,7 @@ def weekly_cdo(path_dat, name_prefix, path_out=None):
     import datetime
     from glob import glob
     from pandas import concat
+    from warnings import warn
 
     # List the contents of the directory
     os.chdir(path_dat)
@@ -101,7 +102,7 @@ def weekly_cdo(path_dat, name_prefix, path_out=None):
     # Check if the datasets are complete (if there are missing dates between start and end)
     df_data_complete = checkYears(files)
     if df_data_complete is not None:
-        warnings.warn("\n        WARNING: There are missing dates in the datasets\n \
+        warn("\n        WARNING: There are missing dates in the datasets\n \
             ----------- SEE BELOW MISSING DATES -----------\n")
         print(df_data_complete)
         print("\n         ------------------------------------------------")
