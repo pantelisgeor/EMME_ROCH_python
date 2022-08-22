@@ -1,8 +1,3 @@
-import os
-import cdsapi
-import os
-
-
 # ------------------------------------------------------------------------------- #
 def downloadCDS(month, year,
                 path_save,
@@ -27,6 +22,9 @@ def downloadCDS(month, year,
         name_prefix: Prefix identifier for the downloaded dataset filename
         variables: User specified variables to download from CDS
     """
+
+    import os
+    import cdsapi
 
     # Check if the path_save directory exists and create it if not
     if not os.path.isdir(path_save):

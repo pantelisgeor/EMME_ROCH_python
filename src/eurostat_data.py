@@ -1,13 +1,9 @@
-import eurostat
-import pandas as pd
-from datetime import datetime
-
-pd.set_option('display.max_columns', 30)
-pd.set_option('display.max_rows', 30)
-
 # ------------------------------------------------------------------------------- #
 def weekToDate(date):
     """Convert a yearWweek format date to date (Monday of week)"""
+
+    from datetime import datetime
+
     try:
         r = datetime.strptime(date + '-1', "%YW%W-%w")
     except Exception as e:
@@ -30,6 +26,9 @@ def weeklyEurostat(dataset, path_nc, nuts_shp):
         pandas dataframe with the eurostat and climate variables within
     """
 
+    import eurostat
+    from pandas import merge
+
     # Get the NUTS3 averaged dataset
     print('Creating NUTS level area averaged climate dataset. . . \n')
     df_clim = getNutsClimAll(path_nc, nuts_shp, n_jobs=1)
@@ -49,10 +48,10 @@ def weeklyEurostat(dataset, path_nc, nuts_shp):
     df_long = df_long.assign(time=df_long.Week.apply(weekToDate))
 
     # Add the climate variables
-    df_ = pd.merge(df_long.rename(columns={'geo\\time': 'nuts_id'}), 
-                   df_clim, 
-                   on=['nuts_id', 'time'], 
-                   how='left')
+    df_ = merge(df_long.rename(columns={'geo\\time': 'nuts_id'}), 
+                df_clim, 
+                on=['nuts_id', 'time'], 
+                how='left')
 
     return df_
 

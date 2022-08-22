@@ -1,15 +1,3 @@
-import numpy as np
-import geopandas as gpd
-import xarray as xr
-from shapely.geometry import Polygon
-from shapely.validation import make_valid
-import pandas as pd
-from tqdm import tqdm
-from functools import partial
-import multiprocessing as mp
-import gc
-
-
 # ------------------------------------------------------------------------------- # 
 def readNuts(shapefile="data-local/NUTS_RG_20M_2021_4326.shp/NUTS_RG_20M_2021_4326.shp",
              nuts_levels=[3], countries=None):
@@ -22,6 +10,8 @@ def readNuts(shapefile="data-local/NUTS_RG_20M_2021_4326.shp/NUTS_RG_20M_2021_43
         nuts_levels: User defined NUTS administrative levels list to be returned (default: [3])
         countries: User defined list of countries to be returned (default: None)
     """
+
+    from geopandas import read_file
     
     # Read the shapefile using the geopandas library
     nuts_shp = gpd.read_file(shapefile)
@@ -45,18 +35,22 @@ def make_polygon(x, y, offset):
         x, y: centre point (x, y)
         offset: Side of square / 2
     """
-    # print(f"x: {x} \ny: {y}\n")
-    # x = round(x, 4)
-    # y = round(y, 4)
+   
+    from shapely.geometry import Polygon
+    from shapely.validation import make_valid
+   
     # Corners of Polygon
     upper_left = (x+offset, y-offset)
     upper_right = (x+offset, y+offset)
     lower_left = (x-offset, y-offset)
     lower_right = (x-offset, y+offset)
+
     # Create Polygon shape and return it
     polygon = Polygon([upper_left, upper_right, lower_left, lower_right])
+
     if not polygon.is_valid:
         polygon = make_valid(polygon)
+
     return polygon
 
 
@@ -74,6 +68,9 @@ def getNutsclim(nuts_ind, df, nuts_shp, coords):
     returns:
         pandas dataframe of the NUTS level area averaged climate variables
     """
+
+    from pandas import merge
+
     # Get the shape of the nuts region
     nuts = nuts_shp.geometry.values[nuts_ind]
 
@@ -92,14 +89,14 @@ def getNutsclim(nuts_ind, df, nuts_shp, coords):
     df = df.assign(lon=df.lon.round(3), lat=df.lat.round(3))
 
     # Add the percentage coverage column
-    df = pd.merge(df, coords_inter[['lon', 'lat', 'perc_cover']], on=['lon', 'lat'], how='left')
+    df = merge(df, coords_inter[['lon', 'lat', 'perc_cover']], on=['lon', 'lat'], how='left')
     df.dropna(inplace=True)
 
     # normalise the percentage coverage for the grid cells in the df dataframe
     grid_points = df.groupby(['lon', 'lat', 'perc_cover'], as_index=False).size().drop('size', axis=1)
     grid_points = grid_points.assign(perc_cover=grid_points.perc_cover/grid_points.perc_cover.sum())
     # Add it back to df
-    df = pd.merge(df.drop('perc_cover', axis=1), grid_points, on=['lon', 'lat'], how='left')
+    df = merge(df.drop('perc_cover', axis=1), grid_points, on=['lon', 'lat'], how='left')
 
     # Normalise the variables
     for var in df.drop(['lon', 'lat', 'time', 'perc_cover'], axis=1).columns:
@@ -110,6 +107,7 @@ def getNutsclim(nuts_ind, df, nuts_shp, coords):
 
     # Add the nuts_id
     df_clim = df_clim.assign(nuts_id=nuts_shp.NUTS_ID.values[nuts_ind])
+
     return df_clim
 
 
@@ -129,10 +127,18 @@ def getNutsClimAll(path_nc, nuts_shp, n_jobs=1):
     """
 
     import warnings
+    from xarray import open_dataset
+    from pandas import DataFrame, concat
+    from tqdm import tqdm
+    from geopandas import GeoDataFrame
+    from gc import collect
+    from multiprocessing import Pool
+    from functools import partial
+    from numpy import arange
     warnings.filterwarnings('ignore')
 
     # Open the netcdf file into an xarray
-    ds = xr.open_dataset(path_nc)
+    ds = open_dataset(path_nc)
 
     # Coordinate names
     if "time_bnds" in ds.variables:
@@ -148,10 +154,10 @@ def getNutsClimAll(path_nc, nuts_shp, n_jobs=1):
     grid_size = round(abs(ds.lat.values[1] - ds.lat.values[0]) / 2, 3)
 
     # Create a dataframe of the coordinates
-    coords = pd.DataFrame()
+    coords = DataFrame()
     for lon in tqdm(ds.lon.values):
         for lat in ds.lat.values:
-            coords = pd.concat([coords, pd.DataFrame({"lon": [lon], "lat": [lat]})])
+            coords = concat([coords, DataFrame({"lon": [lon], "lat": [lat]})])
 
     coords.reset_index(drop=True, inplace=True)
     # Round the numbers
@@ -160,7 +166,7 @@ def getNutsClimAll(path_nc, nuts_shp, n_jobs=1):
     # Create a Polygon array based on the x, y positions of the centres and the grid_size
     geometries = coords.apply(lambda x: make_polygon(x.lon, x.lat, grid_size), axis=1)
     coords['geometry'] = geometries
-    coords = gpd.GeoDataFrame(coords)
+    coords = GeoDataFrame(coords)
 
     # Set the projection
     coords = coords.set_crs(epsg=4326)
@@ -170,22 +176,22 @@ def getNutsClimAll(path_nc, nuts_shp, n_jobs=1):
 
     # Delete variables that are not needed anymore and run garbage collection
     del ds, coord_names, c, geometries
-    gc.collect()
+    collect()
 
     # Run sequentially or parallel (if n_jobs > 1)
     if n_jobs > 1:
-        pool = mp.Pool(n_jobs)
-        df_clim = pd.concat(pool.map(partial(getNutsclim, df=df, nuts_shp=nuts_shp,
-                                             coords=coords), 
-                                     np.arange(nuts_shp.shape[0])))
+        pool = Pool(n_jobs)
+        df_clim = concat(pool.map(partial(getNutsclim, df=df, nuts_shp=nuts_shp,
+                                          coords=coords), 
+                                  arange(nuts_shp.shape[0])))
         pool.close()
         pool.join()
     else:
-        df_clim = pd.DataFrame()
-        for ind in tqdm(np.arange(nuts_shp.shape[0])):
-            df_clim = pd.concat([df_clim, getNutsclim(nuts_ind=ind,
-                                                    df=df, nuts_shp=nuts_shp,
-                                                    coords=coords)])
+        df_clim = DataFrame()
+        for ind in tqdm(arange(nuts_shp.shape[0])):
+            df_clim = concat([df_clim, getNutsclim(nuts_ind=ind,
+                                                   df=df, nuts_shp=nuts_shp,
+                                                   coords=coords)])
 
     return df_clim.reset_index(drop=True)
 

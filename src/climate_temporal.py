@@ -1,15 +1,10 @@
-import os
-from glob import glob
-from warnings import WarningMessage
-import pandas as pd
-import re
-import datetime
-import warnings
-
-
 # ------------------------------------------------------------------------------- # 
 def parse_name(x):
     """returns the details for the filename"""
+
+    import re
+    from pandas import DataFrame
+
     try:
         year = re.search("yr_[0-9]*", x)
         year = int(year.group().split('_')[-1])
@@ -21,9 +16,9 @@ def parse_name(x):
             temp_resolution = "daily"
         else:
             temp_resolution = "hourly"
-        return pd.DataFrame({"year": [year], "month": [month], 
-                             "temp_res": [temp_resolution],
-                             "filename": [x]})
+        return DataFrame({"year": [year], "month": [month], 
+                          "temp_res": [temp_resolution],
+                          "filename": [x]})
     except Exception as e:
         print(f"\nERROR: {x} failed to be parsed.\n")
 
@@ -38,6 +33,8 @@ def checkYears(files):
     returns:
         pandas dataframe within missing dates if there are any, None otherwise
     """
+
+    from pandas import DataFrame, concat
     
     # Get the min and max year in the files dataframe
     min_year, max_year = files.year.min(), files.year.max()
@@ -54,12 +51,12 @@ def checkYears(files):
             # Get the missing months
             missing_months = list(present_months.difference(set(months)))
             if len(missing_months) > 1:
-                df_temp = pd.DataFrame({'year': year, 'months_missing': missing_months})
+                df_temp = DataFrame({'year': year, 'months_missing': missing_months})
             elif len(missing_months) == 1:
-                df_temp = pd.DataFrame({'year': [year], 'months_missing': [missing_months]})
+                df_temp = DataFrame({'year': [year], 'months_missing': [missing_months]})
             # Add it to a dataframe to return
             try:
-                df_res = pd.concat([df_res, df_temp])
+                df_res = concat([df_res, df_temp])
             except NameError:
                 df_res = df_temp
             del months, present_months, df_temp, year
@@ -68,7 +65,6 @@ def checkYears(files):
         return df_res
     except UnboundLocalError:
         return None
-
 
 
 # ------------------------------------------------------------------------------- # 
@@ -86,10 +82,16 @@ def weekly_cdo(path_dat, name_prefix, path_out=None):
         Nothing - saves the aggregated and weekly averaged netcdfs in the same folder
     """
 
+    import os
+    import re
+    import datetime
+    from glob import glob
+    from pandas import concat
+
     # List the contents of the directory
     os.chdir(path_dat)
     files_dir = glob(f"{name_prefix}*.nc")
-    files = pd.concat(map(parse_name, files_dir))
+    files = concat(map(parse_name, files_dir))
     del files_dir
 
     # Sort wrt date
