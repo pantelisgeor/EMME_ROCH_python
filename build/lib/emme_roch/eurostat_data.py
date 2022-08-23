@@ -28,6 +28,7 @@ def weeklyEurostat(dataset, path_nc, nuts_shp):
 
     import eurostat
     from pandas import merge
+    from emme_roch import getNutsClimAll
 
     # Get the NUTS3 averaged dataset
     print('Creating NUTS level area averaged climate dataset. . . \n')

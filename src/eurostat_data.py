@@ -12,7 +12,7 @@ def weekToDate(date):
 
 
 # ------------------------------------------------------------------------------- # 
-def weeklyEurostat(dataset, path_nc, nuts_shp):
+def weeklyEurostat(dataset, path_nc, nuts_shp, n_jobs=1):
     """
     Downloads a weekly dataset from Eurostat based on the dataset code ID and
     combines it with a weekly climate dataset (Netcdf)
@@ -21,6 +21,7 @@ def weeklyEurostat(dataset, path_nc, nuts_shp):
         dataset: Eurostat dataset identifier
         path_nc: Path to the weekly averaged climate dataset
         nuts_shp: NUTS administrative level shapefile
+        n_jobs: Number of processes to calculate the climate spatial averaged data
 
     returns:
         pandas dataframe with the eurostat and climate variables within
@@ -28,6 +29,8 @@ def weeklyEurostat(dataset, path_nc, nuts_shp):
 
     import eurostat
     from pandas import merge
+    # Local import
+    from emme_roch import getNutsClimAll
 
     # Get the NUTS3 averaged dataset
     print('Creating NUTS level area averaged climate dataset. . . \n')

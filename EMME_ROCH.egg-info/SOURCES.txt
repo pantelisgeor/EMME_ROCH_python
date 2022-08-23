@@ -1,3 +1,4 @@
+README.md
 setup.py
 EMME_ROCH.egg-info/PKG-INFO
 EMME_ROCH.egg-info/SOURCES.txt

@@ -16,5 +16,6 @@ setup(name='EMME_ROCH',
                         'numpy',
                         'pandas',
                         'tqdm',
-                        'eurostat']
+                        'eurostat',
+                        'netcdf4']
      )
