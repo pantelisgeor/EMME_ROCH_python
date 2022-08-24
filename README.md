@@ -120,3 +120,15 @@ df_weeklydeaths = er.weeklyEurostat(dataset="demo_r_mweek3",
                                     path_nc="../weekly/ERA_land_20001_20225_weekly.nc",
                                     nuts_shp=nuts3)
 ```
+
+In the graph below, the weekly averaged 2m temperature and total precipitation for the CY000 NUTS3 administrative level region (island of Cyprus) is presented.
+
+![Temperature - Precipitation plot](data-local/clim_plot.png)
+
+In addition, the total deaths per week for Cyprus are shown below, for the time-period for which they are available on the Eurostat database (2015-2022).
+
+![Deaths - Plot](data-local/clim_deaths.png)
+
+As the above graphs, but for the EL301 NUTS3 administrative level region of Greece.
+
+![Greece - data](data-local/clim_deaths_EL301.png)
