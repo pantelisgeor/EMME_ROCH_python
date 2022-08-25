@@ -60,7 +60,7 @@ def weeklyEurostat(dataset, path_nc, nuts_shp, n_jobs=1):
 
 
 # ------------------------------------------------------------------------------- # 
-def TLCC(df, nuts_id, age_group="TOTAL", plot=False, plot_corrs=False):
+def TLCC(df, nuts_id, age_group="TOTAL", start=-30, end=30, plot=False, plot_corrs=False):
 
     """
     Calculates the Time Lagged Cross correlation of the input variable wrt to a set of climatic variables
@@ -70,6 +70,8 @@ def TLCC(df, nuts_id, age_group="TOTAL", plot=False, plot_corrs=False):
             to investigate and the climatic variables
         nuts_id: NUTS3 ID to perform the TLCC analysis
         age_group: Age group to investigate
+        start: Lag times window start
+        end: Lag times window end
         plot: Plot the time-series of the input variable
         plot_corrs: Plot the TLCC graphs for all the climatic variables
 
@@ -96,25 +98,27 @@ def TLCC(df, nuts_id, age_group="TOTAL", plot=False, plot_corrs=False):
         ax.set(xlabel='Time', ylabel='Deaths per week')
         plt.show()
 
+        return
+
     # List the climate variables
     list_clim = df_.drop(['unit', 'age', 'sex', 'nuts_id', 'Week', 'value', 'time'], axis=1).columns
 
     # Calculate the time lagged cross correlations
     lagged_correlation = DataFrame.from_dict(
-        {x: [df_[x].corr(df_['value'].shift(-t)) for t in range(-30, 31)] for x in list_clim})
+        {x: [df_[x].corr(df_['value'].shift(-t)) for t in range(start, end)] for x in list_clim})
 
     # Add the lag time column
-    lagged_correlation = lagged_correlation.assign(lag_time=range(-30, 31))
+    lagged_correlation = lagged_correlation.assign(lag_time=range(start, end))
 
     if plot_corrs:
-        fig, ax = plt.subplots(1, 1, figsize=(20, 10))
+        fig, ax = plt.subplots(1, 1, figsize=(15, 10))
         sns.set(font_scale=2)
         sns.set_style('darkgrid')
         for feat in list_clim:
             sns.lineplot(x=lagged_correlation.lag_time, y=lagged_correlation[feat],
                         ax=ax, label=feat, linewidth=2)
-        ax.set(xlabel='Lag Time', ylabel='Time Lagged Cross Correlation')
-        ax.legend(loc="upper right")
+        ax.set(xlabel='Lag Time', ylabel='Time Lagged Cross Correlation', title=nuts_id)
+        ax.legend(loc="upper right", frameon=False)
         plt.tight_layout()
         plt.show()
     else:

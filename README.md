@@ -132,3 +132,46 @@ In addition, the total deaths per week for Cyprus are shown below, for the time-
 As the above graphs, but for the EL301 NUTS3 administrative level region of Greece.
 
 ![Greece - data](data-local/clim_deaths_EL301.png)
+
+## Time Lagged Cross Correlation (TLCC)
+
+The Time Lagged Cross Correlation matrix can be computed using the *TLCC()* function, for lag times between *start* and *end* (parameters of function which define the start and the end of the lag time window).
+
+**PARAMETERS:**
+df: Pandas dataframe which contains both the values of the variable 
+    to investigate and the climatic variables
+
+1. *nuts_id*: NUTS3 ID to perform the TLCC analysis
+2. *age_group*: Age group to investigate
+3. *start*: Lag times window start
+4. *end*: Lag times window end
+5. *plot*: Plot the time-series of the input variable
+6. *plot_corrs*: Plot the TLCC graphs for all the climatic variables
+
+```python
+er.TLCC(df_weeklydeaths, nuts_id="CY000", age_group='TOTAL', plot_corrs=True, start=-40, end=41)
+```
+
+![Cyprus - TLCC](data-local/TLCC_CY000.png)
+![EL301 - TLCC](data-local/TLCC_EL301.png)
+
+If the plot options are both set to False, the TLCC matrix is returned
+
+```python
+er.TLCC(df_weeklydeaths, nuts_id="CY000", age_group='TOTAL', start=-40, end=41)
+
+
+         d2m       t2m    lai_hv       src       skt        sf       str        sp         e        tp  lag_time
+0   0.010407 -0.015159 -0.203362  0.028186 -0.032241 -0.030274  0.098220  0.135623  0.159725  0.029189       -40
+1  -0.000112 -0.030775 -0.197725  0.044781 -0.047906 -0.029115  0.114077  0.148413  0.154815  0.043098       -39
+2  -0.007128 -0.037629 -0.195005  0.050397 -0.054806 -0.034866  0.117681  0.155442  0.150320  0.051043       -38
+3  -0.013322 -0.045068 -0.193226  0.053501 -0.062162 -0.041319  0.122530  0.161008  0.147957  0.051695       -37
+4  -0.030399 -0.062541 -0.184658  0.063692 -0.079241 -0.035068  0.131956  0.172850  0.137596  0.061896       -36
+..       ...       ...       ...       ...       ...       ...       ...       ...       ...       ...       ...
+76 -0.068158 -0.012837  0.190970 -0.066130 -0.000722 -0.004057 -0.125965 -0.043345 -0.238136 -0.058374        36
+77 -0.061163 -0.006812  0.182840 -0.067894  0.005703  0.001127 -0.128690 -0.047679 -0.237280 -0.058944        37
+78 -0.051565  0.002595  0.175729 -0.073880  0.014533 -0.008695 -0.133621 -0.047626 -0.233620 -0.060070        38
+79 -0.033718  0.019920  0.156946 -0.082660  0.031462 -0.013058 -0.142287 -0.051275 -0.225172 -0.061709        39
+80 -0.029740  0.027334  0.148413 -0.085886  0.038586 -0.011438 -0.149225 -0.057697 -0.225468 -0.061215        40
+```
+
