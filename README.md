@@ -175,3 +175,132 @@ er.TLCC(df_weeklydeaths, nuts_id="CY000", age_group='TOTAL', start=-40, end=41)
 80 -0.029740  0.027334  0.148413 -0.085886  0.038586 -0.011438 -0.149225 -0.057697 -0.225468 -0.061215        40
 ```
 
+## Generalized Additive Models (GAMs) model example
+
+```python
+import pandas as pd
+import seaborn as sns
+from matplotlib import pyplot as plt
+import seaborn as sns
+
+from pygam import LinearGAM, s, f, te
+import numpy as np
+
+
+# ---------------------------------------------------------------------------------------------------- #
+# Parameters to subset the weekly deaths dataset
+nuts_id = "CY000"
+age_group = "TOTAL"
+
+# Subset the dataframe for the above parametes (Use the total number of
+#  deaths instead of Female and Male detahs)
+df_ = df_weeklydeaths.loc[(df.nuts_id == nuts_id) & (df.age == age_group) & (df.sex == 'T')]
+df_.dropna(inplace=True)
+df_.reset_index(drop=True, inplace=True)
+df_.sort_values(by='time', ascending=True, inplace=True)
+
+# Variables to use as predictors
+col_names = ['d2m', 't2m', 'lai_hv', 'src', 'skt', 'sf', 'str', 'sp', 'e', 'tp']
+
+# Split the time series into a training and test set
+df_train = df_.iloc[:-100, :]
+df_test = df_.iloc[-100:, :]
+
+
+# ---------------------------------------------------------------------------------------------------- #
+# Get the features and target variable for the train and test sets
+X_train = df_train[col_names]
+y_train = df_train.value
+
+X_test = df_test[col_names]
+y_test = df_test.value
+
+
+# ---------------------------------------------------------------------------------------------------- #
+# Define and fit the GAM model. Only spline terms are used in this example (probably not accurate)
+gam = LinearGAM(s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9))\   
+    .fit(X_train, y_train)
+gam.summary()
+
+# Set up plot
+fig, ax = plt.subplots(1, 1, figsize=(15, 15))
+sns.set(font_scale=2)
+sns.set_style('darkgrid')
+# Plots
+# Training set
+sns.lineplot(x=df_train.time, y=gam.predict(X_train), ax=ax, color='blue', 
+             linewidth=2, label='prediction - training set')
+ax.plot(df_train.time, gam.prediction_intervals(X_train, width=.95), 
+             color='blue', linestyle='--', alpha=0.4)
+# Test set
+sns.lineplot(x=df_test.time, y=gam.predict(X_test), ax=ax, color='red',
+             linewidth=2, label='prediction - test set')
+ax.plot(df_test.time, gam.prediction_intervals(X_test, width=.95), 
+        color='red', linestyle='--', alpha=0.4)
+# Real data
+sns.lineplot(x=df_.time, y=df_.value, color='black', label='Real', 
+             ax=ax, linestyle='-.', linewidth=2)
+# Difference between prediction and real data
+sns.lineplot(x=df_train.time, y=y_train-gam.predict(X_train), color='r', 
+             ax=ax, label='difference - train set')
+sns.lineplot(x=df_test.time, y=y_test-gam.predict(X_test), color='purple', 
+             ax=ax, label='difference - test set')
+# Other parameters
+ax.axhline(0, color='black', linestyle='--', alpha=0.6)
+ax.set(xlabel='Time', ylabel='Total weekly deaths', title=f"NUTS level ID code : {nuts_id}")
+plt.tight_layout()
+plt.show()
+
+
+# ---------------------------------------------------------------------------------------------------- #
+```
+
+```python
+>>> gam.summary()
+LinearGAM                                                                                                 
+=============================================== ==========================================================
+Distribution:                        NormalDist Effective DoF:                                     87.3324
+Link Function:                     IdentityLink Log Likelihood:                                 -1757.2571
+Number of Samples:                          288 AIC:                                              3691.179
+                                                AICc:                                            3770.6176
+                                                GCV:                                              374.1001
+                                                Scale:                                            177.8053
+                                                Pseudo R-Squared:                                   0.7188
+==========================================================================================================
+Feature Function                  Lambda               Rank         EDoF         P > x        Sig. Code   
+================================= ==================== ============ ============ ============ ============
+s(0)                              [0.6]                20           14.0         8.71e-01                 
+s(1)                              [0.6]                20           13.3         4.81e-01                 
+s(2)                              [0.6]                20           11.9         2.05e-01                 
+s(3)                              [0.6]                20           10.7         3.15e-01                 
+s(4)                              [0.6]                20           8.3          3.28e-01                 
+s(5)                              [0.6]                20           4.3          1.07e-02     *           
+s(6)                              [0.6]                20           7.8          2.94e-01                 
+s(7)                              [0.6]                20           6.9          6.18e-01                 
+s(8)                              [0.6]                20           6.6          1.76e-01                 
+s(9)                              [0.6]                20           3.4          4.00e-01                 
+intercept                                              1            0.0          1.11e-16     ***         
+==========================================================================================================
+Significance codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+```
+
+![CY000 - GAM](data-local/GAM_CY000.png)
+![EL301 - GAM](data-local/GAM_EL301.png)
+
+```python
+plt.figure();
+fig, axs = plt.subplots(1, 10, sharey=True);
+
+titles = col_names
+for i, ax in enumerate(axs):
+    XX = gam.generate_X_grid(term=i)
+    ax.plot(XX[:, i], gam.partial_dependence(term=i, X=XX))
+    ax.plot(XX[:, i], gam.partial_dependence(term=i, X=XX, width=.95)[1], c='r', ls='--')
+    ax.set_ylim(-60, 60)
+    ax.set_title(titles[i]);
+
+plt.tight_layout()
+plt.show()
+```
+
+![CY000 - vars](data-local/GAM_CY000_vars.png)
