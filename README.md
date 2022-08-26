@@ -177,6 +177,8 @@ er.TLCC(df_weeklydeaths, nuts_id="CY000", age_group='TOTAL', start=-40, end=41)
 
 ## Generalized Additive Models (GAMs) model example
 
+For this example the pygam Python package is used (`https://pygam.readthedocs.io`).
+
 ```python
 import pandas as pd
 import seaborn as sns
@@ -304,3 +306,16 @@ plt.show()
 ```
 
 ![CY000 - vars](data-local/GAM_CY000_vars.png)
+
+Since GAMs are additive, it is also super easy to visualize each individual feature function, $f_i(X_i)$. These feature functions describe the effect of each $X_i$ on $y$ individually while marginalizing out all other predictors:
+
+```python
+for i, term in enumerate(gam.terms):
+    if term.isintercept:
+        continue
+    plt.plot(gam.partial_dependence(term=i), label=col_names[i])
+plt.legend(loc='best', frameon=False)
+plt.tight_layout()
+```
+
+![CY000 - feature function](data-local/GAM_CY000_feat_function.png)
