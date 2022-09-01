@@ -17,7 +17,7 @@ def weeklyEurostat(dataset, path_nc, nuts_shp, n_jobs=1):
     Downloads a weekly dataset from Eurostat based on the dataset code ID and
     combines it with a weekly climate dataset (Netcdf)
 
-    params:
+    Args:
         dataset: Eurostat dataset identifier
         path_nc: Path to the weekly averaged climate dataset
         nuts_shp: NUTS administrative level shapefile
@@ -65,7 +65,7 @@ def TLCC(df, nuts_id, age_group="TOTAL", start=-30, end=30, plot=False, plot_cor
     """
     Calculates the Time Lagged Cross correlation of the input variable wrt to a set of climatic variables
 
-    params:
+    Args:
         df: Pandas dataframe which contains both the values of the variable 
             to investigate and the climatic variables
         nuts_id: NUTS3 ID to perform the TLCC analysis

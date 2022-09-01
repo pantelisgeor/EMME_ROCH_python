@@ -27,7 +27,7 @@ def parse_name(x):
 def checkYears(files):
     """Check if the dataset is complete before joining them.
     
-    params:
+    Args:
         files: pandas dataframe with the datasets information
 
     returns:
@@ -73,7 +73,7 @@ def checkVariables(path_dat, name_prefix="ERA_land"):
     Loops through the netcdf datasets in a folder and checks if all of them have the 
     same variables so they can be combined.
 
-    params:
+    Args:
         path_dat: Directory where netcdf datasets are stored
         name_prefix: Dataset identifier
 
@@ -120,7 +120,7 @@ def weekly_cdo(path_dat, name_prefix, path_out=None):
     Uses the system's CDO operations to calculate the weekly mean of a climate
     netcdf variables, starting on a Monday
 
-    params:
+    Args:
         path_dat: Path to where the hourly netcdf files are located
         name_prefix: Prefix str to identify the dataset
         path_out: Directory to save the output dataset (optional)

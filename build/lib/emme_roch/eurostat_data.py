@@ -98,6 +98,8 @@ def TLCC(df, nuts_id, age_group="TOTAL", start=-30, end=30, plot=False, plot_cor
         ax.set(xlabel='Time', ylabel='Deaths per week')
         plt.show()
 
+        return
+
     # List the climate variables
     list_clim = df_.drop(['unit', 'age', 'sex', 'nuts_id', 'Week', 'value', 'time'], axis=1).columns
 

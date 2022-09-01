@@ -44,6 +44,13 @@ The days, area, dataset, name_prefix and variables arguments presented above are
 
 In addition, the user can download all the data for a specified time period (determined by the start year/month and end year/month), to a specified directory (path_save), as in the following code block. Similarly to the previous example, the days, area, dataset, name_prefix and variables arguments used here are the defaults used in the package and can be ommitted.
 
+<p align="center">
+  <img src="data-local/clim_20001.png"/>
+</p>
+
+Map shows the 2m temperature variable for the region for the $1^{st}$ Jan 2000 at 00:00.
+
+
 ```python
 import emme_roch as er
 
@@ -120,6 +127,13 @@ df_weeklydeaths = er.weeklyEurostat(dataset="demo_r_mweek3",
                                     path_nc="../weekly/ERA_land_20001_20225_weekly.nc",
                                     nuts_shp=nuts3)
 ```
+
+In the map below, the grid cells in the ERA5-land dataset that overlap with the Cyprus (NUTS3 ID: CY000) geometry in the shapefile are shown. The area fraction which that the grid cells ovelap with the geometry of the shape is used to calculate the area coverage averaged climatic variables for the NUTS3 admin level region.
+
+![CY000 - overlaps](data-local/clim_overlap_CY000.png)
+
+These match the grid cells for the area present in the netcdf ERA5-land dataset.
+![CY000 - netcdf](data-local/clim_overlap_CY000_nc.png)
 
 In the graph below, the weekly averaged 2m temperature and total precipitation for the CY000 NUTS3 administrative level region (island of Cyprus) is presented.
 

@@ -59,7 +59,7 @@ def getNutsclim(nuts_ind, df, nuts_shp, coords):
     """
     Returns the NUTS level area averaged data for a given NUTS region
     
-    params:
+    Args:
         nuts_ind: index of NUTS from the NUTS admin level shapefile
         df: Climate data pandas dataframe
         nuts_shp: NUTS administrative level shapefile (epsg 4326)
@@ -116,7 +116,7 @@ def getNutsClimAll(path_nc, nuts_shp, n_jobs=1):
     """
     Calculates the NUTS area average climage dataset for a given netcdf file
 
-    params:
+    Args:
         path_nc: path to the netcdf dataset
         nuts_shp: NUTS administrative level shapefile
         n_jobs: Number of parallel processes to open to calculate the NUTS 

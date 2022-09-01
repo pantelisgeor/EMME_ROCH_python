@@ -12,7 +12,7 @@ def downloadCDS(month, year,
     """
     Downloads data for a specified month and year from the Copernicus DataStore
     
-    params:
+    Args:
         month: User specified month of the year (1-12)
         year: User specified calendar year
         path_save: Path to directory where downloaded data will be stored
@@ -81,7 +81,7 @@ def downloadMultipleCDS(month_start, month_end, year_start, year_end, path_save,
     """
     Downloads a range of datasets between month_start/year_start and month_end/year_end
 
-    params:
+    Args:
         month_start: Calendar month to define the start of the required data time period
         month_end: Calendar month to define the end of the required data time period
         year_start: Year to define the start of the required data time period
@@ -132,7 +132,7 @@ def completeDataset(path_save,
     """
     Download missing data and checks for the most up to date data on the CDS dataserver
 
-    params:
+    Args:
         path_save: Path to directory where downloaded data will be stored
         diff_threshold: Time the defined dataset lags behind current date in days (default: 65)
         name_prefix: Prefix identifier for the downloaded dataset filename
