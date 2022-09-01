@@ -5,10 +5,13 @@ def readNuts(shapefile="data-local/NUTS_RG_20M_2021_4326.shp/NUTS_RG_20M_2021_43
     Reads the Eurostat NUTS administrative level shapefile and subsets for a user
     specified NUTS level and user specified countries
     
-    params:
+    Args:
         shapefile: Path to Eurostat NUTS shapefile
         nuts_levels: User defined NUTS administrative levels list to be returned (default: [3])
         countries: User defined list of countries to be returned (default: None)
+
+    Returns:
+        nuts_shp: NUTS level shapefile 
     """
 
     from geopandas import read_file
@@ -31,9 +34,12 @@ def make_polygon(x, y, offset):
     """
     Returns a square shapely polygon based on the centre and offset
     
-    params:
+    Args:
         x, y: centre point (x, y)
         offset: Side of square / 2
+
+    Returns:
+        polygon: Polygon shape (square)
     """
    
     from shapely.geometry import Polygon
@@ -65,7 +71,7 @@ def getNutsclim(nuts_ind, df, nuts_shp, coords):
         nuts_shp: NUTS administrative level shapefile (epsg 4326)
         coords: coordinate shapefile from the climate dataset
 
-    returns:
+    Returns:
         pandas dataframe of the NUTS level area averaged climate variables
     """
 
@@ -122,7 +128,7 @@ def getNutsClimAll(path_nc, nuts_shp, n_jobs=1):
         n_jobs: Number of parallel processes to open to calculate the NUTS 
                 area averaged climate data
 
-    returns:
+    Returns:
         df_clim: pandas dataframe which hold the NUTS level averaged climate data
     """
 

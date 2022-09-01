@@ -1,6 +1,13 @@
 # ------------------------------------------------------------------------------- #
 def weekToDate(date):
-    """Convert a yearWweek format date to date (Monday of week)"""
+    """Convert a yearWweek format date to date (Monday of week)
+    
+    Args:
+        date: date (string)
+
+    Returns:
+        date: date (datetime type)
+    """
 
     from datetime import datetime
 
@@ -23,7 +30,7 @@ def weeklyEurostat(dataset, path_nc, nuts_shp, n_jobs=1):
         nuts_shp: NUTS administrative level shapefile
         n_jobs: Number of processes to calculate the climate spatial averaged data
 
-    returns:
+    Returns:
         pandas dataframe with the eurostat and climate variables within
     """
 
@@ -75,7 +82,7 @@ def TLCC(df, nuts_id, age_group="TOTAL", start=-30, end=30, plot=False, plot_cor
         plot: Plot the time-series of the input variable
         plot_corrs: Plot the TLCC graphs for all the climatic variables
 
-    returns:
+    Returns:
         lagged_correlations: TLCC matrix (pandas dataframe)
     """
 

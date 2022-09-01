@@ -1,6 +1,13 @@
 # ------------------------------------------------------------------------------- # 
 def parse_name(x):
-    """returns the details for the filename"""
+    """Returns the details for the filename
+    
+    Args:
+        x: string
+
+    Returns:
+        Dataframe with parsed name's details
+    """
 
     import re
     from pandas import DataFrame
@@ -30,7 +37,7 @@ def checkYears(files):
     Args:
         files: pandas dataframe with the datasets information
 
-    returns:
+    Returns:
         pandas dataframe within missing dates if there are any, None otherwise
     """
 
@@ -77,7 +84,7 @@ def checkVariables(path_dat, name_prefix="ERA_land"):
         path_dat: Directory where netcdf datasets are stored
         name_prefix: Dataset identifier
 
-    returns:
+    Returns:
         different: list of datasets with different variables
     """
 
@@ -125,7 +132,7 @@ def weekly_cdo(path_dat, name_prefix, path_out=None):
         name_prefix: Prefix str to identify the dataset
         path_out: Directory to save the output dataset (optional)
 
-    returns:
+    Returns:
         Nothing - saves the aggregated and weekly averaged netcdfs in the same folder
     """
 
