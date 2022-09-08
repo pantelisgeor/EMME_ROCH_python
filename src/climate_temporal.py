@@ -224,3 +224,281 @@ def weekly_cdo(path_dat, name_prefix, path_out=None):
 
 
 # ------------------------------------------------------------------------------- # 
+def hourly_to_daily(path_hourly, path_daily, name_prefix="ERA_land", 
+                    merge_daily=False, path_save_all=None):
+    """
+    Convert the hourly ERA-land data to daily (temporal interpolations).
+    Also calculates the relative humidity and minimum and maximum temperatures for each day
+
+    Args:
+        path_hourly: Directory where the hourly ERA5 land dataset is stored
+        path_daily: Target directory to save the daily netcdf datasets
+        name_prefix: String identifier for the downloaded datasets (default: ERA_land)
+        merge_daily: Option to return a single xarray with all the data (all months)
+        path_save_all: Path to save the combined dataset (default: None). If nothing is set, 
+                       it won't save it
+
+    Returns:
+        ds: Combined xarray of all the months processed (boolean, default=False)
+    """
+    
+    # imports
+    from xarray import open_dataset
+    from pandas import concat
+    from glob import glob
+    from warnings import warn
+    from numpy import exp
+    from tqdm import tqdm
+    import os
+
+    # Check if the path_daily (target directory) exists
+    if not os.path.isdir(path_daily):
+        os.mkdir(path_daily)
+
+    # List the contents of the directory (hourly datasets)
+    os.chdir(path_hourly)
+    files_dir = glob(f"{name_prefix}*.nc")
+    files = concat(map(parse_name, files_dir))
+    del files_dir
+
+    # Sort wrt date
+    files.sort_values(by=['year', 'month'], ascending=True, inplace=True)
+    files.reset_index(drop=True, inplace=True)
+
+    # Check if all the datasets are the same (ie contain the same variables)
+    different_datasets = checkVariables(path_dat=path_hourly, name_prefix=name_prefix)
+    # If there are any, don't use them below
+    if len(different_datasets) > 0:
+        files = files.loc[~files.filename.isin(different_datasets)]
+
+    # Check if the datasets are complete (if there are missing dates between start and end)
+    df_data_complete = checkYears(files)
+    if df_data_complete is not None:
+        warn("\n        WARNING: There are missing dates in the datasets\n \
+            ----------- SEE BELOW MISSING DATES -----------\n")
+        print(df_data_complete)
+        print("\n         ------------------------------------------------")
+
+
+    # Loop through the hourly datasets, convert them to daily averages and save them in the
+    # path_daily directory with the same filename
+    for f in tqdm(files.filename.values):
+
+        # Check if the dataset is already present in the directory and skip it if it does
+        if os.path.isfile(f"{path_daily if path_daily.endswith('/') else f'{path_daily}/'}{f}"):
+            continue
+        
+        # Read the file
+        ds = open_dataset(f"{path_hourly if path_hourly.endswith('/') else f'{path_hourly}/'}{f}")
+        
+        # Calculate the relative humidity variable
+        # https://www.omnicalculator.com/physics/relative-humidity
+        RH = 100 * (exp( ( 17.625 * (ds["d2m"]-273.15) ) / ( 243.04 + (ds["d2m"]-273.15) ) ) / \
+            exp( ( 17.625 * (ds["t2m"]-273.15) ) / ( 243.04 + (ds["t2m"] - 273.15) ) ))
+        RH.name = "hurs"
+        RH.attrs = dict(description="Relative Humidity", units="%")
+        # Add it to the ds netcdf
+        ds = ds.merge(RH)
+        
+        # Calculate the daily averages of the variables in the dataset
+        # Drop total precipitation, as this is calculated as the total, not mean
+        ds_daily = ds.drop("tp").resample(time="D").mean()
+        # Add the total precipitation
+        ds_daily = ds_daily.merge(ds["tp"].resample(time="D").sum())
+        # Also add the minimum and maximum daily temperatures
+        ds_daily = ds_daily.merge(ds["t2m"].resample(time="D").min().rename("t2m_min"))
+        ds_daily = ds_daily.merge(ds["t2m"].resample(time="D").max().rename("t2m_max"))
+        
+        # Save it in the path_daily directory
+        ds_daily.to_netcdf(f"{path_daily if path_daily.endswith('/') else f'{path_daily}/'}{f}")
+
+    if merge_daily:
+        for f in tqdm(files.filename.values):
+            # If it's the first set it as ds to merge the rest on it
+            if f == files.filename.values[0]:
+                ds = open_dataset(f"{path_daily if path_daily.endswith('/') else f'{path_daily}/'}{f}")
+            else:
+                # Read the next one and merge with the previous combined ones
+                ds = ds.merge(open_dataset(f"{path_daily if path_daily.endswith('/') else f'{path_daily}/'}{f}"))
+            # Save it to the user defined path as netcdf (if the user has set one, otherwise skip)
+            if path_save_all is not None:
+                ds.to_netcdf(path_save_all)
+        return ds
+    """
+    Convert the hourly ERA-land data to daily (temporal interpolations).
+    Also calculates the relative humidity and minimum and maximum temperatures for each day
+
+    Args:
+        path_hourly: Directory where the hourly ERA5 land dataset is stored
+        path_daily: Target directory to save the daily netcdf datasets
+        name_prefix: String identifier for the downloaded datasets (default: ERA_land)
+
+    Returns:
+        Nothing - saves the daily netcdf datasets in the path_daily directory
+    """
+    
+    # imports
+    from xarray import open_dataset
+    from pandas import concat
+    from glob import glob
+    from warnings import warn
+    from numpy import exp
+    from tqdm import tqdm
+    import os
+
+    # Check if the path_daily (target directory) exists
+    if not os.path.isdir(path_daily):
+        os.mkdir(path_daily)
+
+    # List the contents of the directory (hourly datasets)
+    os.chdir(path_hourly)
+    files_dir = glob(f"{name_prefix}*.nc")
+    files = concat(map(parse_name, files_dir))
+    del files_dir
+
+    # Sort wrt date
+    files.sort_values(by=['year', 'month'], ascending=True, inplace=True)
+    files.reset_index(drop=True, inplace=True)
+
+    # Check if all the datasets are the same (ie contain the same variables)
+    different_datasets = checkVariables(path_dat=path_hourly, name_prefix=name_prefix)
+    # If there are any, don't use them below
+    if len(different_datasets) > 0:
+        files = files.loc[~files.filename.isin(different_datasets)]
+
+    # Check if the datasets are complete (if there are missing dates between start and end)
+    df_data_complete = checkYears(files)
+    if df_data_complete is not None:
+        warn("\n        WARNING: There are missing dates in the datasets\n \
+            ----------- SEE BELOW MISSING DATES -----------\n")
+        print(df_data_complete)
+        print("\n         ------------------------------------------------")
+
+
+    # Loop through the hourly datasets, convert them to daily averages and save them in the
+    # path_daily directory with the same filename
+    for f in tqdm(files.filename.values):
+        # Check if the dataset is already present in the directory and skip it if it does
+        if os.path.isfile(f"{path_daily if path_daily.endswith('/') else f'{path_daily}/'}{f}"):
+            continue
+        # Read the file
+        ds = open_dataset(f"{path_hourly if path_hourly.endswith('/') else f'{path_hourly}/'}{f}")
+        # Calculate the relative humidity variable
+        # https://www.omnicalculator.com/physics/relative-humidity
+        RH = 100 * (exp( (17.625*(ds["d2m"]-273.15)) / (243.04+(ds["d2m"]-273.15)) ) / \
+            exp( (17.625 * (ds["t2m"]-273.15)) / (243.04 + (ds["t2m"]-273.15)) ))
+        RH.name = "hurs"
+        RH.attrs = dict(description="Relative Humidity", units="%")
+        # Add it to the ds netcdf
+        ds = ds.merge(RH)
+        # Calculate the daily averages of the variables in the dataset
+        # Drop total precipitation, as this is calculated as the total, not mean
+        ds_daily = ds.drop("tp").resample(time="D").mean()
+        # Add the total precipitation
+        ds_daily = ds_daily.merge(ds["tp"].resample(time="D").sum())
+        # Also add the minimum and maximum daily temperatures
+        ds_daily = ds_daily.merge(ds["t2m"].resample(time="D").min().rename("t2m_min"))
+        ds_daily = ds_daily.merge(ds["t2m"].resample(time="D").max().rename("t2m_max"))
+        # Save it in the path_daily directory
+        ds_daily.to_netcdf(f"{path_daily if path_daily.endswith('/') else f'{path_daily}/'}{f}")
+
+
+# ------------------------------------------------------------------------------- # 
+def combine_clim(path_dat, name_prefix, mon_start, mon_end, year_start, year_end):
+    """
+    Return an xarray which contains the data between the start and end user defined dates
+    from a directory (path_dat)
+
+    Args:
+        path_dat: Directory where datasets are stored
+        name_prefix: Dataset identifier
+        mon_start: Month to start the dataset
+        mon_end: Month to end the dataset
+        year_start: Year to start tne dataset
+        year_end: Year to end the dataset
+
+    Returns:
+        ds: Combined climated dataset for the user specified time period
+    """
+
+    # imports
+    import os
+    from glob import glob
+    from pandas import concat
+    from warnings import warn
+    from xarray import open_dataset
+    from tqdm import tqdm
+
+    # Check if path_dat ends with the / character and add it if not
+    path_dat = path_dat if path_dat.endswith("/") else f"{path_dat}/"
+
+    # List the contents of the directory (hourly datasets)
+    os.chdir(path_dat)
+    files_dir = glob(f"{name_prefix}*.nc")
+    files = concat(map(parse_name, files_dir))
+    del files_dir
+
+    # Sort wrt date
+    files.sort_values(by=['year', 'month'], ascending=True, inplace=True)
+    files.reset_index(drop=True, inplace=True)
+
+    # Subset based on the year start
+    files = files.loc[files.year >= year_start]
+
+    # Check if all the datasets are the same (ie contain the same variables)
+    different_datasets = checkVariables(path_dat=path_dat, name_prefix=name_prefix)
+    # If there are any, don't use them below
+    if len(different_datasets) > 0:
+        files = files.loc[~files.filename.isin(different_datasets)]
+
+    # Check if the datasets are complete (if there are missing dates between start and end)
+    df_data_complete = checkYears(files)
+    if df_data_complete is not None:
+        warn("\n        WARNING: There are missing dates in the datasets\n \
+            ----------- SEE BELOW MISSING DATES -----------\n")
+        print(df_data_complete)
+        print("\n         ------------------------------------------------")
+
+    # Loop through the dates, read the dataset and combine them
+    for year in tqdm(range(year_start, year_end+1)):
+        if year == year_start:
+            for month in range(mon_start, 13):
+                try:
+                    ds_ = open_dataset(
+                        f"{path_dat}{files.loc[(files.month == month) & (files.year == year)].filename.values[0]}")
+                    try:
+                        ds = ds.merge(ds_)
+                    except Exception as e:
+                        ds = ds_
+                    del ds_
+                except Exception as e:
+                    print(f"Year: {year} -- Month: {month} has failed because of \n{e}")
+        elif year == year_end:
+            for month in range(1, mon_end+1):
+                try:
+                    ds_ = open_dataset(
+                        f"{path_dat}{files.loc[(files.month == month) & (files.year == year)].filename.values[0]}")
+                    try:
+                        ds = ds.merge(ds_)
+                    except Exception as e:
+                        ds = ds_
+                    del ds_
+                except Exception as e:
+                    print(f"Year: {year} -- Month: {month} has failed because of \n{e}")
+        else:
+            for month in range(1, 13):
+                try:
+                    ds_ = open_dataset(
+                        f"{path_dat}{files.loc[(files.month == month) & (files.year == year)].filename.values[0]}")
+                    try:
+                        ds = ds.merge(ds_)
+                    except Exception as e:
+                        ds = ds_
+                    del ds_
+                except Exception as e:
+                    print(f"Year: {year} -- Month: {month} has failed because of \n{e}")
+                    
+    return ds
+
+
+# ------------------------------------------------------------------------------- # 
