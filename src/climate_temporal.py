@@ -243,13 +243,14 @@ def hourly_to_daily(path_hourly, path_daily, name_prefix="ERA_land",
     """
     
     # imports
-    from xarray import open_dataset
-    from pandas import concat
+    import os
     from glob import glob
     from warnings import warn
+
     from numpy import exp
+    from pandas import concat
     from tqdm import tqdm
-    import os
+    from xarray import open_dataset
 
     # Check if the path_daily (target directory) exists
     if not os.path.isdir(path_daily):
@@ -291,14 +292,16 @@ def hourly_to_daily(path_hourly, path_daily, name_prefix="ERA_land",
         # Read the file
         ds = open_dataset(f"{path_hourly if path_hourly.endswith('/') else f'{path_hourly}/'}{f}")
         
-        # Calculate the relative humidity variable
-        # https://www.omnicalculator.com/physics/relative-humidity
-        RH = 100 * (exp( ( 17.625 * (ds["d2m"]-273.15) ) / ( 243.04 + (ds["d2m"]-273.15) ) ) / \
-            exp( ( 17.625 * (ds["t2m"]-273.15) ) / ( 243.04 + (ds["t2m"] - 273.15) ) ))
-        RH.name = "hurs"
-        RH.attrs = dict(description="Relative Humidity", units="%")
-        # Add it to the ds netcdf
-        ds = ds.merge(RH)
+        # Relative Humidity
+        if 'hurs' not in ds.variables:
+            # Calculate the relative humidity variable
+            # https://www.omnicalculator.com/physics/relative-humidity
+            RH = 100 * (exp( ( 17.625 * (ds["d2m"]-273.15) ) / ( 243.04 + (ds["d2m"]-273.15) ) ) / \
+                exp( ( 17.625 * (ds["t2m"]-273.15) ) / ( 243.04 + (ds["t2m"] - 273.15) ) ))
+            RH.name = "hurs"
+            RH.attrs = dict(description="Relative Humidity", units="%")
+            # Add it to the ds netcdf
+            ds = ds.merge(RH)
         
         # Calculate the daily averages of the variables in the dataset
         # Drop total precipitation, as this is calculated as the total, not mean
@@ -324,83 +327,6 @@ def hourly_to_daily(path_hourly, path_daily, name_prefix="ERA_land",
             if path_save_all is not None:
                 ds.to_netcdf(path_save_all)
         return ds
-    """
-    Convert the hourly ERA-land data to daily (temporal interpolations).
-    Also calculates the relative humidity and minimum and maximum temperatures for each day
-
-    Args:
-        path_hourly: Directory where the hourly ERA5 land dataset is stored
-        path_daily: Target directory to save the daily netcdf datasets
-        name_prefix: String identifier for the downloaded datasets (default: ERA_land)
-
-    Returns:
-        Nothing - saves the daily netcdf datasets in the path_daily directory
-    """
-    
-    # imports
-    from xarray import open_dataset
-    from pandas import concat
-    from glob import glob
-    from warnings import warn
-    from numpy import exp
-    from tqdm import tqdm
-    import os
-
-    # Check if the path_daily (target directory) exists
-    if not os.path.isdir(path_daily):
-        os.mkdir(path_daily)
-
-    # List the contents of the directory (hourly datasets)
-    os.chdir(path_hourly)
-    files_dir = glob(f"{name_prefix}*.nc")
-    files = concat(map(parse_name, files_dir))
-    del files_dir
-
-    # Sort wrt date
-    files.sort_values(by=['year', 'month'], ascending=True, inplace=True)
-    files.reset_index(drop=True, inplace=True)
-
-    # Check if all the datasets are the same (ie contain the same variables)
-    different_datasets = checkVariables(path_dat=path_hourly, name_prefix=name_prefix)
-    # If there are any, don't use them below
-    if len(different_datasets) > 0:
-        files = files.loc[~files.filename.isin(different_datasets)]
-
-    # Check if the datasets are complete (if there are missing dates between start and end)
-    df_data_complete = checkYears(files)
-    if df_data_complete is not None:
-        warn("\n        WARNING: There are missing dates in the datasets\n \
-            ----------- SEE BELOW MISSING DATES -----------\n")
-        print(df_data_complete)
-        print("\n         ------------------------------------------------")
-
-
-    # Loop through the hourly datasets, convert them to daily averages and save them in the
-    # path_daily directory with the same filename
-    for f in tqdm(files.filename.values):
-        # Check if the dataset is already present in the directory and skip it if it does
-        if os.path.isfile(f"{path_daily if path_daily.endswith('/') else f'{path_daily}/'}{f}"):
-            continue
-        # Read the file
-        ds = open_dataset(f"{path_hourly if path_hourly.endswith('/') else f'{path_hourly}/'}{f}")
-        # Calculate the relative humidity variable
-        # https://www.omnicalculator.com/physics/relative-humidity
-        RH = 100 * (exp( (17.625*(ds["d2m"]-273.15)) / (243.04+(ds["d2m"]-273.15)) ) / \
-            exp( (17.625 * (ds["t2m"]-273.15)) / (243.04 + (ds["t2m"]-273.15)) ))
-        RH.name = "hurs"
-        RH.attrs = dict(description="Relative Humidity", units="%")
-        # Add it to the ds netcdf
-        ds = ds.merge(RH)
-        # Calculate the daily averages of the variables in the dataset
-        # Drop total precipitation, as this is calculated as the total, not mean
-        ds_daily = ds.drop("tp").resample(time="D").mean()
-        # Add the total precipitation
-        ds_daily = ds_daily.merge(ds["tp"].resample(time="D").sum())
-        # Also add the minimum and maximum daily temperatures
-        ds_daily = ds_daily.merge(ds["t2m"].resample(time="D").min().rename("t2m_min"))
-        ds_daily = ds_daily.merge(ds["t2m"].resample(time="D").max().rename("t2m_max"))
-        # Save it in the path_daily directory
-        ds_daily.to_netcdf(f"{path_daily if path_daily.endswith('/') else f'{path_daily}/'}{f}")
 
 
 # ------------------------------------------------------------------------------- # 
@@ -424,10 +350,11 @@ def combine_clim(path_dat, name_prefix, mon_start, mon_end, year_start, year_end
     # imports
     import os
     from glob import glob
-    from pandas import concat
     from warnings import warn
-    from xarray import open_dataset
+
+    from pandas import concat
     from tqdm import tqdm
+    from xarray import open_dataset
 
     # Check if path_dat ends with the / character and add it if not
     path_dat = path_dat if path_dat.endswith("/") else f"{path_dat}/"
@@ -497,8 +424,82 @@ def combine_clim(path_dat, name_prefix, mon_start, mon_end, year_start, year_end
                     del ds_
                 except Exception as e:
                     print(f"Year: {year} -- Month: {month} has failed because of \n{e}")
-                    
+
     return ds
+
+
+# ------------------------------------------------------------------------------- # 
+def add_hurs(path_in, path_out, name_prefix="ERA_land"):
+    """
+    Adds the Relative Humidity variable in the netcdf dataset and saves it elsewhere
+
+    Args:
+        path_in: Directory which holds the netcdf datasets without hurs
+        path_out: Directory to save the datasets with the hurs variable
+        name_prefix: Dataset identifier (default: "ERA_land" )
+    """
+
+    # imports
+    import os
+    from glob import glob
+    from warnings import warn
+
+    from pandas import concat
+    from numpy import exp
+    from tqdm import tqdm
+    from xarray import open_dataset
+
+    # Check if paths end with the / character and add it if not
+    path_in = path_in if path_in.endswith("/") else f"{path_in}/"
+    path_out = path_out if path_out.endswith("/") else f"{path_out}/"
+
+    # Check if the path_out directory exists and create it if not
+    if not os.path.isdir(path_out):
+        os.mkdir(path_out)
+
+    # List the contents of the directory (hourly datasets)
+    os.chdir(path_in)
+    files_dir = glob(f"{name_prefix}*.nc")
+    files = concat(map(parse_name, files_dir))
+    del files_dir
+
+    # Sort wrt date
+    files.sort_values(by=['year', 'month'], ascending=True, inplace=True)
+    files.reset_index(drop=True, inplace=True)
+
+    # Check if all the datasets are the same (ie contain the same variables)
+    different_datasets = checkVariables(path_dat=path_in, name_prefix=name_prefix)
+    # If there are any, don't use them below
+    if len(different_datasets) > 0:
+        files = files.loc[~files.filename.isin(different_datasets)]
+
+    # Check if the datasets are complete (if there are missing dates between start and end)
+    df_data_complete = checkYears(files)
+    if df_data_complete is not None:
+        warn("\n        WARNING: There are missing dates in the datasets\n \
+            ----------- SEE BELOW MISSING DATES -----------\n")
+        print(df_data_complete)
+        print("\n         ------------------------------------------------")
+
+
+    # Loop through the datasets in files and add the hurs variable and save 
+    # them in the path_out directory
+    for f in tqdm(files.filename.values):
+        # Check if the dataset is already present in the directory and skip it if it does
+        if os.path.isfile(f"{path_out}{f}"):
+            continue
+        # Read the dataset
+        ds = open_dataset(f"{path_in}{f}")
+        # Calculate the relative humidity variable
+        # https://www.omnicalculator.com/physics/relative-humidity
+        RH = 100 * (exp( ( 17.625 * (ds["d2m"]-273.15) ) / ( 243.04 + (ds["d2m"]-273.15) ) ) / \
+            exp( ( 17.625 * (ds["t2m"]-273.15) ) / ( 243.04 + (ds["t2m"] - 273.15) ) ))
+        RH.name = "hurs"
+        RH.attrs = dict(description="Relative Humidity", units="%")
+        # Add it to the ds netcdf
+        ds = ds.merge(RH)
+        # Save it
+        ds.to_netcdf(f"{path_out}{f}")
 
 
 # ------------------------------------------------------------------------------- # 
