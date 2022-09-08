@@ -429,23 +429,31 @@ def combine_clim(path_dat, name_prefix, mon_start, mon_end, year_start, year_end
 
 
 # ------------------------------------------------------------------------------- # 
-def add_hurs(path_in, path_out, name_prefix="ERA_land"):
+def add_hurs_wb(path_in, path_out, name_prefix="ERA_land", hurs=True, wb=True):
     """
-    Adds the Relative Humidity variable in the netcdf dataset and saves it elsewhere
+    Adds the Relative Humidity and wet bulb temperature variables in the netcdf dataset 
+    and saves it elsewhere
 
     Args:
         path_in: Directory which holds the netcdf datasets without hurs
         path_out: Directory to save the datasets with the hurs variable
-        name_prefix: Dataset identifier (default: "ERA_land" )
+        name_prefix: Dataset identifier (default: "ERA_land")
+        hurs: Boolean to calculate the relative humidity variable (default: True)
+        wb: Boolean to calculate the Wet Bulb Temperature variable (default: True)
     """
+
+    if not hurs and not wb:
+        print("ERROR: Either hurs or wb boolean indicators (or both) must be True. . .")
+        return None
 
     # imports
     import os
     from glob import glob
     from warnings import warn
+    from gc import collect
 
     from pandas import concat
-    from numpy import exp
+    from numpy import exp, arctan, sqrt
     from tqdm import tqdm
     from xarray import open_dataset
 
@@ -485,21 +493,43 @@ def add_hurs(path_in, path_out, name_prefix="ERA_land"):
     # Loop through the datasets in files and add the hurs variable and save 
     # them in the path_out directory
     for f in tqdm(files.filename.values):
+        
         # Check if the dataset is already present in the directory and skip it if it does
         if os.path.isfile(f"{path_out}{f}"):
             continue
+        
         # Read the dataset
         ds = open_dataset(f"{path_in}{f}")
-        # Calculate the relative humidity variable
-        # https://www.omnicalculator.com/physics/relative-humidity
-        RH = 100 * (exp( ( 17.625 * (ds["d2m"]-273.15) ) / ( 243.04 + (ds["d2m"]-273.15) ) ) / \
-            exp( ( 17.625 * (ds["t2m"]-273.15) ) / ( 243.04 + (ds["t2m"] - 273.15) ) ))
-        RH.name = "hurs"
-        RH.attrs = dict(description="Relative Humidity", units="%")
-        # Add it to the ds netcdf
-        ds = ds.merge(RH)
+
+        if hurs:
+            # Calculate the Relative Humidity Variable
+            # https://www.omnicalculator.com/physics/relative-humidity
+            RH = 100 * (exp( ( 17.625 * (ds["d2m"]-273.15) ) / ( 243.04 + (ds["d2m"]-273.15) ) ) / \
+                exp( ( 17.625 * (ds["t2m"]-273.15) ) / ( 243.04 + (ds["t2m"] - 273.15) ) ))
+            RH.name = "hurs"
+            RH.attrs = dict(description="Relative Humidity", units="%")
+            # Add it to the ds netcdf
+            ds = ds.merge(RH)
+
+        if wb:
+            # Wet bulb temperature
+            # https://www.omnicalculator.com/physics/wet-bulb
+            WB = (ds["t2m"] - 273.15) * arctan(0.151977 * sqrt(ds["hurs"] + 8.313659) ) + \
+                arctan( (ds["t2m"] - 273.15) + ds['hurs'] ) - \
+                    arctan( ds['hurs'] - 1.676331) + \
+                        0.00391838 * ds["hurs"] ** 1.5 * arctan(0.023101 * ds["hurs"]) - \
+                            4.668035
+            WB.name = "wb"
+            WB.attrs = dict(description="Wet Bulb Temperature", units="degrees Celcius")
+            # Add it to the ds xarray
+            ds = ds.merge(WB)
+
         # Save it
         ds.to_netcdf(f"{path_out}{f}")
+
+        # Tidy up
+        del ds, RH, WB
+        collect()
 
 
 # ------------------------------------------------------------------------------- # 
